@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>URL Shortener</title>
+    <style>
+        :root {
+            --bg: #f6f8fa;
+            --card-bg: #ffffff;
+            --border: #d8dee4;
+            --text: #1f2328;
+            --text-muted: #59636e;
+            --primary: #1f6feb;
+            --primary-hover: #1a5fd0;
+            --primary-tint: #eaf1ff;
+            --ok-bg: #dafbe1;
+            --ok-border: #4ac26b;
+            --ok-text: #116329;
+            --err-bg: #ffebe9;
+            --err-border: #ff8182;
+            --err-text: #82071e;
+            --chip-bg: #eff2f5;
+            --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            --radius: 12px;
+            --shadow: 0 1px 2px rgba(31, 35, 40, .05), 0 8px 24px rgba(31, 35, 40, .06);
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #0d1117;
+                --card-bg: #161b22;
+                --border: #30363d;
+                --text: #e6edf3;
+                --text-muted: #8b949e;
+                --primary: #4090ff;
+                --primary-hover: #58a6ff;
+                --primary-tint: rgba(64, 144, 255, .12);
+                --ok-bg: rgba(46, 160, 67, .15);
+                --ok-border: #2ea043;
+                --ok-text: #56d364;
+                --err-bg: rgba(248, 81, 73, .15);
+                --err-border: #f85149;
+                --err-text: #ff7b72;
+                --chip-bg: #21262d;
+                --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 24px rgba(0, 0, 0, .45);
+            }
+        }
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+            max-width: 680px;
+            margin: 0 auto;
+            padding: 48px 16px 64px;
+            color: var(--text);
+            background: var(--bg);
+        }
+        header { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+        h1 { font-size: 1.5rem; margin: 0; letter-spacing: -.01em; }
+        .badge {
+            font-size: .7rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+            color: var(--primary); background: var(--primary-tint); border: 1px solid var(--border);
+            padding: 3px 9px; border-radius: 999px;
+        }
+        .lede { color: var(--text-muted); margin: 0 0 28px; font-size: .95rem; }
+        section {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            padding: 20px 22px;
+            margin-bottom: 20px;
+            transition: box-shadow .15s ease;
+        }
+        .section-head { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+        .icon {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 30px; height: 30px; flex-shrink: 0; border-radius: 8px;
+            background: var(--primary-tint); color: var(--primary);
+        }
+        .icon svg { width: 16px; height: 16px; }
+        h2 { font-size: 1.05rem; margin: 0; }
+        p.sub { color: var(--text-muted); margin: 0 0 14px; font-size: .88rem; line-height: 1.4; }
+        p.sub code {
+            background: var(--chip-bg); padding: 1px 5px; border-radius: 4px; font-family: var(--mono); font-size: .85em;
+        }
+        form { display: flex; gap: 8px; }
+        input {
+            flex: 1; min-width: 0; padding: 10px 12px; font-size: .95rem;
+            border: 1px solid var(--border); border-radius: 8px;
+            background: var(--card-bg); color: var(--text);
+            transition: border-color .15s ease, box-shadow .15s ease;
+        }
+        input::placeholder { color: var(--text-muted); }
+        input:focus {
+            outline: none; border-color: var(--primary);
+            box-shadow: 0 0 0 3px var(--primary-tint);
+        }
+        button {
+            padding: 10px 18px; font-size: .95rem; font-weight: 600; border: 0; border-radius: 8px;
+            background: var(--primary); color: #fff; cursor: pointer;
+            transition: background .15s ease, transform .05s ease;
+        }
+        button:hover:not(:disabled) { background: var(--primary-hover); }
+        button:active:not(:disabled) { transform: scale(.97); }
+        button:disabled { opacity: .55; cursor: default; }
+        button.copy {
+            padding: 4px 10px; font-size: .78rem; font-weight: 500;
+            background: var(--chip-bg); color: var(--text); border: 1px solid var(--border);
+        }
+        button.copy:hover:not(:disabled) { background: var(--border); }
+        .expiry-row { margin-top: 12px; }
+        .expiry-row input { flex: 0 0 auto; }
+        .result {
+            padding: 14px 16px; border-radius: 10px; margin-top: 14px; word-break: break-all;
+            font-size: .92rem; animation: rise .18s ease;
+        }
+        .ok { background: var(--ok-bg); border: 1px solid var(--ok-border); color: var(--ok-text); }
+        .err { background: var(--err-bg); border: 1px solid var(--err-border); color: var(--err-text); }
+        .result::before { font-weight: 600; margin-right: 6px; }
+        .ok::before { content: "✓"; }
+        .err::before { content: "!"; display: inline-block; width: 16px; height: 16px; line-height: 16px;
+            text-align: center; border-radius: 50%; background: var(--err-border); color: #fff; font-size: .75rem; }
+        .row { display: flex; align-items: center; gap: 10px; margin: 6px 0; }
+        .row .label { width: 92px; flex-shrink: 0; color: inherit; opacity: .75; font-size: .82rem; font-weight: 600; }
+        .row .value {
+            flex: 1; min-width: 0; font-family: var(--mono); font-size: .85rem;
+            color: inherit; text-decoration: none;
+        }
+        a.value:hover { text-decoration: underline; }
+        footer { font-size: .85rem; color: var(--text-muted); text-align: center; margin-top: 32px; }
+        footer a { color: var(--primary); text-decoration: none; }
+        footer a:hover { text-decoration: underline; }
+        @keyframes rise { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: none; } }
+    </style>
+</head>
+<body>
+<header>
+    <h1>URL Shortener</h1>
+    <span class="badge">Prototype</span>
+</header>
+<p class="lede">A small manual test console for the API &mdash; shorten a link, resolve it, and check its stats.</p>
+
+<section>
+    <div class="section-head">
+        <span class="icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 17H7A5 5 0 0 1 7 7h2"/><path d="M15 7h2a5 5 0 1 1 0 10h-2"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+        </span>
+        <h2>Shorten a URL</h2>
+    </div>
+    <p class="sub">Enter a long http or https URL to get its short code and short URL.</p>
+    <form id="shorten-form">
+        <input id="long-url" type="text" placeholder="https://example.com/some/long/path" autocomplete="off">
+        <button type="submit">Shorten</button>
+    </form>
+    <div class="row expiry-row">
+        <label class="label" for="expires-at">Expires</label>
+        <input id="expires-at" type="datetime-local" autocomplete="off">
+    </div>
+    <p class="sub">Optional. Leave blank for a link that never expires.</p>
+    <div id="shorten-result" hidden></div>
+</section>
+
+<section>
+    <div class="section-head">
+        <span class="icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>
+        </span>
+        <h2>Go to the original URL</h2>
+    </div>
+    <p class="sub">Enter a short code (e.g. <code>aB3xY9z</code>) or a short URL (e.g. <code>http://localhost:8080/aB3xY9z</code>). Navigates you to the target after a moment &mdash; this counts as a click.</p>
+    <form id="redirect-form">
+        <input id="short-input" type="text" placeholder="Short code or short URL" autocomplete="off">
+        <button type="submit">Go</button>
+    </form>
+    <div id="redirect-result" hidden></div>
+</section>
+
+<section>
+    <div class="section-head">
+        <span class="icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        </span>
+        <h2>View analytics</h2>
+    </div>
+    <p class="sub">Enter a short code (e.g. <code>aB3xY9z</code>) or a short URL to see its click stats. Does not count as a click.</p>
+    <form id="analytics-form">
+        <input id="analytics-input" type="text" placeholder="Short code or short URL" autocomplete="off">
+        <button type="submit">View</button>
+    </form>
+    <div id="analytics-result" hidden></div>
+</section>
+
+<footer>
+    Explore the API in <a href="/swagger-ui.html">Swagger UI</a>
+    (<a href="/v3/api-docs">OpenAPI JSON</a>) &middot;
+    <a href="/actuator/health">Health check</a>
+</footer>
+
+<script>
+    function show(target, kind, ...nodes) {
+        target.className = 'result ' + kind;
+        target.replaceChildren(...nodes);
+        target.hidden = false;
+    }
+
+    function errorText(body) {
+        return document.createTextNode(`${body.status} ${body.title}: ${body.detail}`);
+    }
+
+    function resultRow(label, value, href) {
+        const row = document.createElement('div');
+        row.className = 'row';
+        const name = document.createElement('span');
+        name.className = 'label';
+        name.textContent = label;
+        const text = document.createElement(href ? 'a' : 'span');
+        text.className = 'value';
+        text.textContent = value;
+        if (href) {
+            text.href = href;
+            text.target = '_blank';
+            text.rel = 'noopener';
+        }
+        const copy = document.createElement('button');
+        copy.type = 'button';
+        copy.className = 'copy';
+        copy.textContent = 'Copy';
+        copy.addEventListener('click', async () => {
+            await navigator.clipboard.writeText(value);
+            copy.textContent = 'Copied';
+            setTimeout(() => copy.textContent = 'Copy', 1500);
+        });
+        row.append(name, text, copy);
+        return row;
+    }
+
+    // Accepts "aB3xY9z", "/aB3xY9z", "localhost:8080/aB3xY9z" or "http://host/aB3xY9z?x#y".
+    function extractShortCode(input) {
+        const path = input.trim().split(/[?#]/)[0].replace(/\/+$/, '');
+        const code = path.substring(path.lastIndexOf('/') + 1);
+        return /^[0-9A-Za-z]+$/.test(code) ? code : null;
+    }
+
+    async function withButtonDisabled(form, action) {
+        const button = form.querySelector('button[type=submit]');
+        button.disabled = true;
+        try {
+            await action();
+        } finally {
+            button.disabled = false;
+        }
+    }
+
+    const shortenForm = document.getElementById('shorten-form');
+    const longUrl = document.getElementById('long-url');
+    const expiresAt = document.getElementById('expires-at');
+    const shortenResult = document.getElementById('shorten-result');
+
+    shortenForm.addEventListener('submit', (event) => {
+        event.preventDefault();
+        withButtonDisabled(shortenForm, async () => {
+            try {
+                const payload = { url: longUrl.value };
+                if (expiresAt.value) {
+                    // datetime-local has no zone; the browser treats it as local time, so
+                    // toISOString() gives the UTC instant the backend requires (ISO-8601 with a zone).
+                    payload.expiresAt = new Date(expiresAt.value).toISOString();
+                }
+                const response = await fetch('/api/urls', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const body = await response.json();
+                if (response.ok) {
+                    show(shortenResult, 'ok',
+                        resultRow('Short code', body.shortCode),
+                        resultRow('Short URL', body.shortUrl, body.shortUrl));
+                } else {
+                    show(shortenResult, 'err', errorText(body));
+                }
+            } catch (e) {
+                show(shortenResult, 'err', document.createTextNode('Request failed: ' + e.message));
+            }
+        });
+    });
+
+    const redirectForm = document.getElementById('redirect-form');
+    const shortInput = document.getElementById('short-input');
+    const redirectResult = document.getElementById('redirect-result');
+
+    redirectForm.addEventListener('submit', (event) => {
+        event.preventDefault();
+        const code = extractShortCode(shortInput.value);
+        if (!code) {
+            show(redirectResult, 'err',
+                document.createTextNode('Enter a short code (letters and digits) or a short URL ending in one.'));
+            return;
+        }
+        withButtonDisabled(redirectForm, async () => {
+            try {
+                // Look up the original URL without redirecting (not counted as a click), so unknown (404)
+                // and expired (410) codes show an error here; only the navigation to /{code} counts.
+                const response = await fetch('/api/urls/' + encodeURIComponent(code));
+                if (response.ok) {
+                    const body = await response.json();
+                    const status = document.createElement('div');
+                    status.textContent = 'Redirecting…';
+                    show(redirectResult, 'ok', resultRow('Original URL', body.originalUrl), status);
+                    setTimeout(() => window.location.assign('/' + code), 1500);
+                } else {
+                    show(redirectResult, 'err', errorText(await response.json()));
+                }
+            } catch (e) {
+                show(redirectResult, 'err', document.createTextNode('Request failed: ' + e.message));
+            }
+        });
+    });
+
+    const analyticsForm = document.getElementById('analytics-form');
+    const analyticsInput = document.getElementById('analytics-input');
+    const analyticsResult = document.getElementById('analytics-result');
+
+    analyticsForm.addEventListener('submit', (event) => {
+        event.preventDefault();
+        const code = extractShortCode(analyticsInput.value);
+        if (!code) {
+            show(analyticsResult, 'err',
+                document.createTextNode('Enter a short code (letters and digits) or a short URL ending in one.'));
+            return;
+        }
+        withButtonDisabled(analyticsForm, async () => {
+            try {
+                const response = await fetch('/api/urls/' + encodeURIComponent(code) + '/analytics');
+                const body = await response.json();
+                if (response.ok) {
+                    show(analyticsResult, 'ok',
+                        resultRow('Original URL', body.originalUrl),
+                        resultRow('Clicks', String(body.clickCount)),
+                        resultRow('Created', body.createdAt),
+                        resultRow('Expires', body.expiresAt ?? 'Never'),
+                        resultRow('Expired', body.expired ? 'Yes' : 'No'),
+                        resultRow('Last clicked', body.lastClickedAt ?? 'Never'));
+                } else {
+                    show(analyticsResult, 'err', errorText(body));
+                }
+            } catch (e) {
+                show(analyticsResult, 'err', document.createTextNode('Request failed: ' + e.message));
+            }
+        });
+    });
+</script>
+</body>
+</html>
